@@ -2,11 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"go/ast"
 	"go/doc"
 	"go/parser"
 	"go/token"
+	ht "html/template"
 	"io"
 	"log"
 	"os"
@@ -15,12 +17,15 @@ import (
 )
 
 func main() {
+	var htmlOut = flag.String("html", "", "generated documentation output")
+	flag.Parse()
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: doccer PACKAGE")
+		log.Fatal("Usage: wallhack PACKAGE")
+		flag.Usage()
 		return
 	}
 
-	pkgPath := os.Args[1]
+	pkgPath := os.Args[len(os.Args)-1]
 
 	gopath := os.Getenv("GOPATH")
 	fullPath := gopath + "/src/" + pkgPath
@@ -33,13 +38,13 @@ func main() {
 		return
 	}
 
+	var endpointMap = map[string]interface{}{}
 	for pkgName, pkg := range pkgs {
 		d := doc.New(pkg, "root/"+pkgName, 0)
 		funcDocs := map[string]string{}
 		for _, f := range d.Funcs {
 			funcDocs[f.Name] = f.Doc
 		}
-		var endpointMap = map[string]interface{}{}
 		for _, t := range d.Vars {
 			for i, name := range t.Names {
 				spec := t.Decl.Specs[i]
@@ -63,6 +68,30 @@ func main() {
 				}
 			}
 		}
+	}
+
+	if *htmlOut != "" {
+		htmlTmpl, err := ht.New("doc").Funcs(ht.FuncMap{
+			"json": func(x interface{}) ht.HTML {
+				buf, err := json.MarshalIndent(x, "    ", "\t")
+				if err != nil {
+					return ht.HTML(err.Error())
+				}
+				return ht.HTML(string(buf))
+			},
+		}).Parse(html)
+		if err != nil {
+			log.Fatal(err)
+		}
+		htmlOutput, err := os.OpenFile(*htmlOut, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = htmlTmpl.Execute(htmlOutput, endpointMap)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
 		json.NewEncoder(os.Stdout).Encode(endpointMap)
 	}
 }
@@ -82,10 +111,11 @@ func readSpec(imp, routeVar, pkg string) ([]endpoint, error) {
 		return nil, fmt.Errorf("template: %s", err.Error())
 	}
 
-	output, err := os.OpenFile("tmp_.go", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+	output, err := os.OpenFile("/tmp/tmp_.go", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 	if err != nil {
 		return nil, fmt.Errorf("openfile: %s", err.Error())
 	}
+	defer os.Remove("/tmp/tmp_.go")
 
 	tmpl.Execute(output, map[string]string{
 		"Import":  imp,
@@ -95,7 +125,7 @@ func readSpec(imp, routeVar, pkg string) ([]endpoint, error) {
 
 	output.Close()
 
-	goRun := exec.Command("go", "run", "tmp_.go")
+	goRun := exec.Command("go", "run", "/tmp/tmp_.go")
 	out, err := goRun.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -107,7 +137,6 @@ func readSpec(imp, routeVar, pkg string) ([]endpoint, error) {
 	go io.Copy(os.Stderr, errPipe)
 	err = goRun.Start()
 	if err != nil {
-		os.Remove("tmp_.go")
 		return nil, fmt.Errorf("go run: %s\n", err.Error())
 	}
 
@@ -118,8 +147,6 @@ func readSpec(imp, routeVar, pkg string) ([]endpoint, error) {
 	if err != nil {
 		return nil, fmt.Errorf("json error: %s", err.Error())
 	}
-
-	os.Remove("tmp_.go")
 
 	return endpoints, nil
 }
