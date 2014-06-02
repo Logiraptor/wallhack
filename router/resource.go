@@ -23,6 +23,20 @@ type Route struct {
 	H    HandlerGenerator
 }
 
+type genSelf struct {
+	h http.Handler
+}
+
+// Handler implements the HandlerGenerator interface
+func (g genSelf) Handler() http.Handler {
+	return http.Handler(g.h)
+}
+
+// GenSelf turns an http.Handler into a HandlerGenerator
+func GenSelf(h http.Handler) HandlerGenerator {
+	return genSelf{h: h}
+}
+
 // NewRoute creates a Route object
 func NewRoute(method, url string, handler HandlerGenerator) Route {
 	return Route{M: method, U: url, H: handler}

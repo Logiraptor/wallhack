@@ -192,30 +192,32 @@ type endpoint struct {
 func main() {
 	var endpoints = []endpoint{}
 	for _, v := range {{.Package}}.{{.Var}} {
-		val := reflect.ValueOf(v.H.(router.Wrapper).F)
-		fName := runtime.FuncForPC(val.Pointer()).Name()
-		nameStart := strings.LastIndex(fName, ".")
-		pkgName := fName[:nameStart]
-		fName = fName[nameStart+1:]
+		if wr, ok := v.H.(router.Wrapper); ok {
+			val := reflect.ValueOf(wr.F)
+			fName := runtime.FuncForPC(val.Pointer()).Name()
+			nameStart := strings.LastIndex(fName, ".")
+			pkgName := fName[:nameStart]
+			fName = fName[nameStart+1:]
 
-		response := val.Type().Out(0)
-		for response.Kind() == reflect.Ptr {
-			response = response.Elem()
-		}
-		responseInstance := reflect.New(response).Elem()
-		os.Stderr.Write([]byte(response.String()))
-		respInt := responseInstance.Interface()
-		if ex, ok := respInt.(router.Exampler); ok {
-			respInt = ex.Example(v.M, v.U, fName)
-		}
+			response := val.Type().Out(0)
+			for response.Kind() == reflect.Ptr {
+				response = response.Elem()
+			}
+			responseInstance := reflect.New(response).Elem()
+			os.Stderr.Write([]byte(response.String()))
+			respInt := responseInstance.Interface()
+			if ex, ok := respInt.(router.Exampler); ok {
+				respInt = ex.Example(v.M, v.U, fName)
+			}
 
-		endpoints = append(endpoints, endpoint{
-			Method:   v.M,
-			URL:      v.U,
-			Package:  pkgName,
-			Func:     fName,
-			Response: respInt,
-		})
+			endpoints = append(endpoints, endpoint{
+				Method:   v.M,
+				URL:      v.U,
+				Package:  pkgName,
+				Func:     fName,
+				Response: respInt,
+			})	
+		}
 	}
 
 	json.NewEncoder(os.Stdout).Encode(endpoints)
