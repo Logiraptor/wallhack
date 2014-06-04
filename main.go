@@ -45,6 +45,13 @@ func main() {
 		for _, f := range d.Funcs {
 			funcDocs[f.Name] = f.Doc
 		}
+
+		for _, t := range d.Types {
+			for _, f := range t.Funcs {
+				funcDocs[f.Name] = f.Doc
+			}
+		}
+
 		for _, t := range d.Vars {
 			for i, name := range t.Names {
 				spec := t.Decl.Specs[i]
