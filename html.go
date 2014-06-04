@@ -3,7 +3,7 @@ package main
 var html = `
 <!DOCTYPE html>
 <html>
-<title>Hello Strapdown</title>
+<title>Wallhack</title>
 
 <xmp theme="cerulean" style="display:none;">
 
@@ -14,7 +14,7 @@ var html = `
 
 ### Documentation
 
-{{$router.Doc}}
+{{$router.Doc | trust}}
 
 ### Contents
 
@@ -29,7 +29,7 @@ Name | URL
 
     {{.Method}} {{.URL}}
 
-{{.Doc}}
+{{.Doc | trust}}
 
 {{if .Response}}
 Response:

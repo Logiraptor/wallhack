@@ -86,6 +86,9 @@ func main() {
 				}
 				return ht.HTML(string(buf))
 			},
+			"trust": func(s string) ht.HTML {
+				return ht.HTML(s)
+			},
 		}).Parse(html)
 		if err != nil {
 			log.Fatal(err)
