@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"runtime/debug"
 
 	"github.com/gorilla/mux"
 )
@@ -77,7 +78,7 @@ func wrapFunc(f reflect.Value) http.Handler {
 		panic(fmt.Errorf("%s: %s", f.String(), err.Error()))
 	}
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		rw.Header().Set("Content-Type", "application/json")
+		rw.Header().Set("Content-Type", "application/json; charset=UTF-8")
 		out := f.Call([]reflect.Value{reflect.ValueOf(rw), reflect.ValueOf(req)})
 		obj, e := out[0].Interface(), out[1].Interface()
 		if err, ok := e.(error); ok && err != nil {
@@ -132,7 +133,7 @@ func Recovery(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
-				json.NewEncoder(rw).Encode(struct{ Error string }{fmt.Errorf("PANIC: %v", r).Error()})
+				json.NewEncoder(rw).Encode(struct{ Error string }{fmt.Errorf("PANIC: %v :%s", r, string(debug.Stack())).Error()})
 			}
 		}()
 		h.ServeHTTP(rw, req)
